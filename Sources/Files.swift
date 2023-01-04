@@ -61,6 +61,12 @@ extension Location {
       fileManager: .default))
   }
 
+  public init(url: Foundation.URL) throws {
+    try self.init(storage: Storage(
+      url: url,
+      fileManager: .default))
+  }
+
   // MARK: Public
 
   public var description: String {
@@ -207,6 +213,12 @@ public final class Storage<LocationType: Location> {
 
   fileprivate init(path: String, fileManager: FileManager) throws {
     self.path = path
+    self.fileManager = fileManager
+    try validatePath()
+  }
+
+  fileprivate init(url: Foundation.URL, fileManager: FileManager) throws {
+    self.path = url.path
     self.fileManager = fileManager
     try validatePath()
   }
