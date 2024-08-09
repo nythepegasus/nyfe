@@ -36,7 +36,7 @@ public enum LocationKind {
 // MARK: - Location
 
 /// Protocol adopted by types that represent locations on a file system.
-public protocol Location: Equatable, CustomStringConvertible, ExpressibleByArgument, Codable {
+public protocol Location: Equatable, CustomStringConvertible, ExpressibleByArgument, Codable, Sendable {
   /// The kind of location that is being represented (see `LocationKind`).
   static var kind: LocationKind { get }
   /// The underlying storage for the item at the represented location.
@@ -105,7 +105,7 @@ extension Location {
 
   /// The parent folder that this location is contained within.
   public var parent: Folder? {
-    return storage.makeParentPath(for: path).flatMap {
+    return makeParentPath(for: path).flatMap {
       try? Folder(path: $0)
     }
   }
@@ -146,7 +146,7 @@ extension Location {
   /// - parameter keepExtension: Whether the location's `extension` should
   ///   remain unmodified (default: `true`).
   /// - throws: `LocationError` if the item couldn't be renamed.
-  public func rename(to newName: String, keepExtension: Bool = true) throws {
+  public func rename(to newName: String, keepExtension: Bool = true) throws -> Storage<Self> {
     guard let parent = parent else {
       throw LocationError(path: path, reason: .cannotRenameRoot)
     }
@@ -159,7 +159,7 @@ extension Location {
       }
     }
 
-    try storage.move(
+    return try storage.move(
       to: parent.path + newName,
       errorReasonProvider: LocationErrorReason.renameFailed)
   }
@@ -167,8 +167,8 @@ extension Location {
   /// Move this location to a new parent folder
   /// - parameter newParent: The folder to move this item to.
   /// - throws: `LocationError` if the location couldn't be moved.
-  public func move(to newParent: Folder) throws {
-    try storage.move(
+  public func move(to newParent: Folder) throws -> Storage<Self> {
+    return try storage.move(
       to: newParent.path + name,
       errorReasonProvider: LocationErrorReason.moveFailed)
   }
@@ -207,39 +207,23 @@ extension Location {
 /// Type used to store information about a given file system location. You don't
 /// interact with this type as part of the public API, instead you use the APIs
 /// exposed by `Location`, `File`, and `Folder`.
-public final class Storage<LocationType: Location> {
+public struct Storage<LocationType: Location>: Sendable {
 
   // MARK: Lifecycle
 
   fileprivate init(path: String, fileManager: FileManager) throws {
-    self.path = path
+    
     self.fileManager = fileManager
-    try validatePath()
-  }
-
-  fileprivate init(url: Foundation.URL, fileManager: FileManager) throws {
-    self.path = url.path
-    self.fileManager = fileManager
-    try validatePath()
-  }
-
-  // MARK: Fileprivate
-
-  fileprivate private(set) var path: String
-
-  // MARK: Private
-
-  private let fileManager: FileManager
-
-  private func validatePath() throws {
+    var path = path
     switch LocationType.kind {
     case .file:
       guard !path.isEmpty else {
         throw LocationError(path: path, reason: .emptyFilePath)
       }
     case .folder:
+      var path = path
       if path.isEmpty { path = fileManager.currentDirectoryPath }
-      if !path.hasSuffix("/") { path += "/" }
+      if !path.hasSuffix("/") { path = "\(path)/" }
     }
 
     if path.hasPrefix("~") {
@@ -255,13 +239,35 @@ public final class Storage<LocationType: Location> {
         throw LocationError(path: parentPath, reason: .missing)
       }
 
+      var path = path
       path.replaceSubrange(..<parentReferenceRange.upperBound, with: parentPath)
     }
+    self.path = path
 
     guard fileManager.locationExists(at: path, kind: LocationType.kind) else {
       throw LocationError(path: path, reason: .missing)
     }
   }
+
+  fileprivate init(url: Foundation.URL, fileManager: FileManager) throws {
+    try self.init(path: url.path, fileManager: fileManager)
+  }
+
+  // MARK: Fileprivate
+
+  fileprivate let path: String
+
+  // MARK: Private
+
+  nonisolated(unsafe) private let fileManager: FileManager
+}
+
+fileprivate func makeParentPath(for path: String) -> String? {
+  guard path != "/" else { return nil }
+  let url = URL(fileURLWithPath: path)
+  let components = url.pathComponents.dropFirst().dropLast()
+  guard !components.isEmpty else { return "/" }
+  return "/" + components.joined(separator: "/") + "/"
 }
 
 extension Storage {
@@ -269,26 +275,18 @@ extension Storage {
     return (try? fileManager.attributesOfItem(atPath: path)) ?? [:]
   }
 
-  fileprivate func makeParentPath(for path: String) -> String? {
-    guard path != "/" else { return nil }
-    let url = URL(fileURLWithPath: path)
-    let components = url.pathComponents.dropFirst().dropLast()
-    guard !components.isEmpty else { return "/" }
-    return "/" + components.joined(separator: "/") + "/"
-  }
-
   fileprivate func move(
     to newPath: String,
-    errorReasonProvider: (Error) -> LocationErrorReason) throws
+    errorReasonProvider: (Error) -> LocationErrorReason) throws -> Storage<LocationType>
   {
     do {
       try fileManager.moveItem(atPath: path, toPath: newPath)
 
       switch LocationType.kind {
       case .file:
-        path = newPath
+        return try Storage(path: path, fileManager: fileManager)
       case .folder:
-        path = newPath.appendingSuffixIfNeeded("/")
+        return try Storage(path: newPath.appendingSuffixIfNeeded("/"), fileManager: fileManager)
       }
     } catch {
       throw LocationError(path: path, reason: errorReasonProvider(error))

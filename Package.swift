@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version:5.10
 
 ///  Files
 ///  Copyright (c) John Sundell 2017
@@ -18,11 +18,9 @@ let package = Package(
   targets: [
     .target(
       name: "Files",
-      dependencies: [
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-        .product(name: "SystemPackage", package: "swift-system")
-      ],
-      path: "Sources"),
+      dependencies: [.product(name: "ArgumentParser", package: "swift-argument-parser")],
+      path: "Sources",
+      swiftSettings: [ .enableExperimentalFeature("StrictConcurrency")]),
     .testTarget(
       name: "FilesTests",
       dependencies: ["Files"]),
