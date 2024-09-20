@@ -13,11 +13,15 @@ let package = Package(
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.1.4"),
+    .package(url: "https://github.com/apple/swift-system.git", from: "1.2.1"),
   ],
   targets: [
     .target(
       name: "Files",
-      dependencies: [.product(name: "ArgumentParser", package: "swift-argument-parser")],
+      dependencies: [
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "SystemPackage", package: "swift-system")
+      ],
       path: "Sources"),
     .testTarget(
       name: "FilesTests",

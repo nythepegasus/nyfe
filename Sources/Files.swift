@@ -1045,6 +1045,12 @@ extension Folder {
 
 // MARK: - FilesError
 
+enum FileError: Swift.Error {
+  case noParent(file: String = #fileID, function: String = #function, line: UInt = #line)
+  case copyFailed(error: Swift.Error, file: String = #fileID, function: String = #function, line: UInt = #line)
+  case invalidFileName(String, file: String = #fileID, function: String = #function, line: UInt = #line)
+}
+
 /// Error type thrown by all of Files' throwing APIs.
 public struct FilesError<Reason>: Error {
   /// The absolute path that the error occured at.
