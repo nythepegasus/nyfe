@@ -212,6 +212,7 @@ extension File {
     try destinationFile.write(read())
   }
   
+  @discardableResult
   public func copyIfDifferent(
     to copyFolder: Folder,
     changingToName: String? = nil,
