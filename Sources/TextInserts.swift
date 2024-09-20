@@ -186,6 +186,32 @@ extension String {
 
 }
 
+// MARK: - Copy or Write
+
+extension File {
+  public func copyOrWrite(_ destinationFolder: Folder) throws {
+    guard destinationFolder.containsFile(named: name) else {
+      try copy(to: destinationFolder)
+      return
+    }
+    let destinationFile = try destinationFolder.file(named: name)
+    try destinationFile.write(read())
+  }
+
+  public func copyOrWritePreservingSubPath(from root: Folder, _ destinationFolder: Folder) throws {
+    let relativeParent = parent?.path(relativeTo: root) ?? destinationFolder.path
+    let relativeDestinationFolder = try destinationFolder.createSubfolderIfNeeded(at: relativeParent)
+
+    guard relativeDestinationFolder.containsFile(named: name) else {
+      try copy(to: relativeDestinationFolder)
+      return
+    }
+
+    let destinationFile = try relativeDestinationFolder.file(named: name)
+    try destinationFile.write(read())
+  }
+
+}
 // MARK: Private
 
 private func begin(tag: String) -> String {
@@ -195,3 +221,4 @@ private func begin(tag: String) -> String {
 private func end(tag: String) -> String {
   begin(tag: tag) + "end"
 }
+
