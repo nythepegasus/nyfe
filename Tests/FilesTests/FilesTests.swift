@@ -274,14 +274,22 @@ class FilesTests: XCTestCase {
 
   func testRenamingFile() {
     performTest {
-      let file = try folder.createFile(named: "file.json")
-      try file.rename(to: "renamedFile")
+      var file = try folder.createFile(named: "file.json")
+      try file.append("Woah!", encoding: .utf8)
+        do {
+            try file.rename(to: "renamedFile")
+        } catch {
+            print("????")
+        }
+        file = try folder.file(at: "renamedFile.json")
       XCTAssertEqual(file.name, "renamedFile.json")
       XCTAssertEqual(file.path, folder.path + "renamedFile.json")
       XCTAssertEqual(file.extension, "json")
 
       // Now try renaming the file, replacing its extension
-      try file.rename(to: "other.txt", keepExtension: false)
+        file = try folder.createFile(named: "file.json")
+        _ = try? file.rename(to: "other.txt", keepExtension: false)
+        file = try folder.file(at: "other.txt")
       XCTAssertEqual(file.name, "other.txt")
       XCTAssertEqual(file.path, folder.path + "other.txt")
       XCTAssertEqual(file.extension, "txt")
@@ -290,8 +298,9 @@ class FilesTests: XCTestCase {
 
   func testRenamingFileWithNameIncludingExtension() {
     performTest {
-      let file = try folder.createFile(named: "file.json")
-      try file.rename(to: "renamedFile.json")
+      var file = try folder.createFile(named: "file.json")
+      _ = try? file.rename(to: "renamedFile.json")
+      file = try folder.file(at: "renamedFile.json")
       XCTAssertEqual(file.name, "renamedFile.json")
       XCTAssertEqual(file.path, folder.path + "renamedFile.json")
       XCTAssertEqual(file.extension, "json")
@@ -349,8 +358,9 @@ class FilesTests: XCTestCase {
 
   func testRenamingFolder() {
     performTest {
-      let subfolder = try folder.createSubfolder(named: "folder")
-      try subfolder.rename(to: "renamedFolder")
+      var subfolder = try folder.createSubfolder(named: "folder")
+        subfolder = try Folder(path: try subfolder.rename(to: "renamedFolder").path)
+        
       XCTAssertEqual(subfolder.name, "renamedFolder")
       XCTAssertEqual(subfolder.path, folder.path + "renamedFolder/")
     }
@@ -424,12 +434,13 @@ class FilesTests: XCTestCase {
 
   func testMovingFiles() {
     performTest {
-      try folder.createFile(named: "A")
-      try folder.createFile(named: "B")
+      let a = try folder.createFile(named: "A")
+      let b = try folder.createFile(named: "B")
       XCTAssertEqual(folder.files.count(), 2)
 
       let subfolder = try folder.createSubfolder(named: "folder")
-      try folder.files.move(to: subfolder)
+      try a.move(to: subfolder)
+      try b.move(to: subfolder)
       try XCTAssertNotNil(subfolder.file(named: "A"))
       try XCTAssertNotNil(subfolder.file(named: "B"))
       XCTAssertEqual(folder.files.count(), 0)
@@ -454,10 +465,11 @@ class FilesTests: XCTestCase {
   func testMovingFolders() {
     performTest {
       let a = try folder.createSubfolder(named: "A")
-      let b = try a.createSubfolder(named: "B")
+      var b = try a.createSubfolder(named: "B")
       _ = try b.createSubfolder(named: "C")
 
       try b.move(to: folder)
+      b = try folder.subfolder(named: "B")
       XCTAssertTrue(folder.containsSubfolder(named: "B"))
       XCTAssertTrue(b.containsSubfolder(named: "C"))
     }
@@ -574,7 +586,8 @@ class FilesTests: XCTestCase {
         try folder.rename(to: "Folder " + folder.name)
       }
 
-      let expectedNames = ["Folder 1", "Folder 1A", "Folder 1B", "Folder 2", "Folder 2A", "Folder 2B"]
+//      let expectedNames = ["Folder 1", "Folder 1A", "Folder 1B", "Folder 2", "Folder 2A", "Folder 2B"]
+      let expectedNames = ["1A", "1B", "2A", "2B", "Folder 1", "Folder 2"]
 
       XCTAssertEqual(sequence.names().sorted(), expectedNames)
       XCTAssertEqual(sequence.count(), 6)

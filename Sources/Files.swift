@@ -1,24 +1,24 @@
-///  Files
-/// 
-///  Copyright (c) 2017-2019 John Sundell. Licensed under the MIT license, as follows:
-/// 
-///  Permission is hereby granted, free of charge, to any person obtaining a copy
-///  of this software and associated documentation files (the "Software"), to deal
-///  in the Software without restriction, including without limitation the rights
-///  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-///  copies of the Software, and to permit persons to whom the Software is
-///  furnished to do so, subject to the following conditions:
-/// 
-///  The above copyright notice and this permission notice shall be included in all
-///  copies or substantial portions of the Software.
-/// 
-///  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-///  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-///  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-///  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-///  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-///  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-///  SOFTWARE.
+//  Files
+// 
+//  Copyright (c) 2017-2019 John Sundell. Licensed under the MIT license, as follows:
+// 
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+// 
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+// 
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
 
 import ArgumentParser
 import Foundation
@@ -41,7 +41,7 @@ public protocol Location: Equatable, CustomStringConvertible, ExpressibleByArgum
   static var kind: LocationKind { get }
   /// The underlying storage for the item at the represented location.
   /// You don't interact with this object as part of the public API.
-  var storage: Storage<Self> { get }
+  var storage: Storage<Self> { get set }
   /// Initialize an instance of this location with its underlying storage.
   /// You don't call this initializer as part of the public API, instead
   /// use `init(path:)` on either `File` or `Folder`.
@@ -76,7 +76,7 @@ extension Location {
 
   /// The path of this location, relative to the root of the file system.
   public var path: String {
-    return storage.path
+      return storage.path
   }
 
   /// A URL representation of the location's `path`.
@@ -146,7 +146,8 @@ extension Location {
   /// - parameter keepExtension: Whether the location's `extension` should
   ///   remain unmodified (default: `true`).
   /// - throws: `LocationError` if the item couldn't be renamed.
-  public func rename(to newName: String, keepExtension: Bool = true) throws -> Storage<Self> {
+    @discardableResult
+    public func rename(to newName: String, keepExtension: Bool = true) throws -> Storage<Self> {
     guard let parent = parent else {
       throw LocationError(path: path, reason: .cannotRenameRoot)
     }
@@ -167,7 +168,8 @@ extension Location {
   /// Move this location to a new parent folder
   /// - parameter newParent: The folder to move this item to.
   /// - throws: `LocationError` if the location couldn't be moved.
-  public func move(to newParent: Folder) throws -> Storage<Self> {
+    @discardableResult
+    public func move(to newParent: Folder) throws -> Storage<Self> {
     return try storage.move(
       to: newParent.path + name,
       errorReasonProvider: LocationErrorReason.moveFailed)
@@ -211,7 +213,7 @@ public struct Storage<LocationType: Location>: Sendable {
 
   // MARK: Lifecycle
 
-  fileprivate init(path: String, fileManager: FileManager) throws {
+    public init(path: String, fileManager: FileManager) throws {
     
     self.fileManager = fileManager
     var path = path
@@ -221,7 +223,6 @@ public struct Storage<LocationType: Location>: Sendable {
         throw LocationError(path: path, reason: .emptyFilePath)
       }
     case .folder:
-      var path = path
       if path.isEmpty { path = fileManager.currentDirectoryPath }
       if !path.hasSuffix("/") { path = "\(path)/" }
     }
@@ -231,33 +232,29 @@ public struct Storage<LocationType: Location>: Sendable {
       path = homePath + path.dropFirst()
     }
 
-    while let parentReferenceRange = path.range(of: "../") {
-      let folderPath = String(path[..<parentReferenceRange.lowerBound])
+    var pat = path
+    while let parentReferenceRange = pat.range(of: "../") {
+      let folderPath = String(pat[..<parentReferenceRange.lowerBound])
       let parentPath = makeParentPath(for: folderPath) ?? "/"
 
       guard fileManager.locationExists(at: parentPath, kind: .folder) else {
         throw LocationError(path: parentPath, reason: .missing)
       }
 
-      var path = path
-      path.replaceSubrange(..<parentReferenceRange.upperBound, with: parentPath)
+      pat.replaceSubrange(..<parentReferenceRange.upperBound, with: parentPath)
     }
-    self.path = path
+    self.path = pat
 
     guard fileManager.locationExists(at: path, kind: LocationType.kind) else {
       throw LocationError(path: path, reason: .missing)
     }
   }
 
-  fileprivate init(url: Foundation.URL, fileManager: FileManager) throws {
+  public init(url: Foundation.URL, fileManager: FileManager) throws {
     try self.init(path: url.path, fileManager: fileManager)
   }
 
-  // MARK: Fileprivate
-
-  fileprivate let path: String
-
-  // MARK: Private
+  public let path: String
 
   nonisolated(unsafe) private let fileManager: FileManager
 }
@@ -284,7 +281,7 @@ extension Storage {
 
       switch LocationType.kind {
       case .file:
-        return try Storage(path: path, fileManager: fileManager)
+        return try Storage(path: newPath, fileManager: fileManager)
       case .folder:
         return try Storage(path: newPath.appendingSuffixIfNeeded("/"), fileManager: fileManager)
       }
@@ -422,7 +419,7 @@ public struct File: Location {
 
   // MARK: Public
 
-  public let storage: Storage<File>
+    public var storage: Storage<File>
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
@@ -574,7 +571,7 @@ public struct Folder: Location {
 
   // MARK: Public
 
-  public let storage: Storage<Folder>
+    public var storage: Storage<Folder>
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
@@ -869,6 +866,7 @@ extension Folder {
   /// - throws: `WriteError` if a new folder couldn't be created.
   @discardableResult
   public func createSubfolderIfNeeded(withName name: String) throws -> Folder {
+      
     return try (try? subfolder(named: name)) ?? createSubfolder(named: name)
   }
 
@@ -1050,7 +1048,7 @@ enum FileError: Swift.Error {
 }
 
 /// Error type thrown by all of Files' throwing APIs.
-public struct FilesError<Reason>: Error {
+public struct FilesError<Reason>: Error where Reason: Sendable {
   /// The absolute path that the error occured at.
   public var path: String
   /// The reason that the error occured.
@@ -1079,7 +1077,7 @@ extension FilesError: CustomStringConvertible {
 // MARK: - LocationErrorReason
 
 /// Enum listing reasons that a location manipulation could fail.
-public enum LocationErrorReason {
+public enum LocationErrorReason: Sendable {
   /// The location couldn't be found.
   case missing
   /// An empty path was given when refering to a file.
@@ -1103,7 +1101,7 @@ public enum LocationErrorReason {
 // MARK: - WriteErrorReason
 
 /// Enum listing reasons that a write operation could fail.
-public enum WriteErrorReason {
+public enum WriteErrorReason: Sendable {
   /// An empty path was given when writing or creating a location.
   case emptyPath
   /// A folder couldn't be created because of an underlying system error.
@@ -1119,7 +1117,7 @@ public enum WriteErrorReason {
 // MARK: - ReadErrorReason
 
 /// Enum listing reasons that a read operation could fail.
-public enum ReadErrorReason {
+public enum ReadErrorReason: Sendable {
   /// A file couldn't be read because of an underlying system error.
   case readFailed(Error)
   /// Failed to decode a given set of data into a string.
